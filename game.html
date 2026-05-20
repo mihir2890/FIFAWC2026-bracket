@@ -232,16 +232,13 @@ select:focus{border-color:var(--lime)}
     <div class="lcard" style="max-width:500px">
       <div class="lcard-icon">🎉</div>
       <div class="lcard-title">League Created!</div>
-      <div class="lcard-sub">Share this code with your friends</div>
-      <div class="code-box" id="dispCode" onclick="copyCode()" title="Click to copy">WC0000</div>
-      <div id="dispBinId" style="font-size:11px;color:var(--muted);margin-bottom:4px;font-family:monospace;letter-spacing:.5px"></div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Click the code to copy the share link</div>
-      <div class="info-box">
-        <b>How to share:</b><br>
-        1. Click the code above to copy the full share link<br>
-        2. Send it to your friends — that's it!<br>
-        3. Everyone opens the link, enters their name, fills bracket<br>
-        4. You enter actual results → scores auto-update
+      <div class="lcard-sub">Send this link to everyone in your league</div>
+      <div id="shareUrlBox" onclick="copyShareLink()" style="background:rgba(200,241,53,.08);border:2px dashed rgba(200,241,53,.4);border-radius:12px;padding:14px 16px;margin:14px 0;cursor:pointer;word-break:break-all;font-size:12px;color:var(--lime);font-family:monospace;line-height:1.6">Generating link...</div>
+      <button class="btn btn-lime" onclick="copyShareLink()" style="margin-bottom:14px">📋 Copy Share Link</button>
+      <div class="info-box" style="border-left-color:var(--orange)">
+        <b style="color:var(--orange)">Share the LINK above — not just the code!</b><br>
+        The link has everything friends need to join.<br><br>
+        Friends open the link, enter their name, and they are in.
       </div>
       <button class="btn btn-lime" onclick="enterAdmin()">Fill My Bracket →</button>
     </div>
@@ -964,6 +961,10 @@ async function createLeague(){
     document.getElementById('dispCode').textContent=code;
     document.getElementById('loadCreate').style.display='none';
     showScreen('sShare');
+    // Set share URL box after screen is shown
+    const sUrl=window.location.origin+window.location.pathname+'?join='+code+'&bid='+id;
+    const sBox=document.getElementById('shareUrlBox');
+    if(sBox) sBox.textContent=sUrl;
   }catch(e){document.getElementById('loadCreate').style.display='none';showErr('errCreate','Error: '+e.message)}
 }
 async function joinLeague(){
@@ -987,17 +988,27 @@ async function joinLeague(){
     enterGame();
   }catch(e){showErr('errLanding','Error: '+e.message)}
 }
-function copyCode(){
-  navigator.clipboard.writeText(leagueCode+'\nBin ID: '+binId)
-    .then(()=>alert('Copied!\nCode: '+leagueCode+'\nBin ID: '+binId));
-}
+function copyCode(){ copyShareLink(); }
 function enterAdmin(){
   let bins=JSON.parse(localStorage.getItem('wc26_bins')||'{}');
   bins[leagueCode]=binId;localStorage.setItem('wc26_bins',JSON.stringify(bins));
-  // Show bin ID on share screen
-  const el=document.getElementById('dispBinId');
-  if(el) el.textContent='Bin ID: '+binId;
+  const sUrl=window.location.origin+window.location.pathname+'?join='+leagueCode+'&bid='+binId;
+  const sBox=document.getElementById('shareUrlBox');
+  if(sBox) sBox.textContent=sUrl;
   enterGame();
+}
+function copyShareLink(){
+  const shareUrl=window.location.origin+window.location.pathname+'?join='+leagueCode+'&bid='+binId;
+  const box=document.getElementById('shareUrlBox');
+  const btn=document.querySelector('#sShare .btn-lime');
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(shareUrl).then(function(){
+      if(box){box.textContent='Copied! Paste in your group chat.';}
+      if(btn){const o=btn.textContent;btn.textContent='Copied!';setTimeout(function(){btn.textContent=o;box.textContent=shareUrl;},3000);}
+    });
+  } else {
+    window.prompt('Copy this link and send it to friends:',shareUrl);
+  }
 }
 function enterGame(){
   document.getElementById('gName').textContent=playerName+(isAdmin?' (Admin)':'');
@@ -1557,8 +1568,8 @@ function renderFixtures(){
 // ===== UI =====
 function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active')}
 function showErr(id,msg){const e=document.getElementById(id);e.textContent=msg;e.style.display=msg?'block':'none'}
-const TABS=['groups','fixtures','3rd','r32','r16','qf','sf','fin','lb','res'];
-let curTab='groups';
+var TABS=['groups','fixtures','3rd','r32','r16','qf','sf','fin','lb','res'];
+var curTab='groups';
 function sw(id){
   curTab=id;
   document.querySelectorAll('.tb').forEach((b,i)=>b.classList.toggle('on',TABS[i]===id));
@@ -1610,8 +1621,8 @@ function updateScore(){
 }
 
 // Override sw with new tab IDs
-const TABS=['groups','fixtures','3rd','r32','r16','qf','sf','fin','lb','res'];
-let curTab='groups';
+var TABS=['groups','fixtures','3rd','r32','r16','qf','sf','fin','lb','res'];
+var curTab='groups';
 function sw(id){
   curTab=id;
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('on',TABS[i]===id));
@@ -1625,30 +1636,42 @@ function sw(id){
 function renderGroups(){
   const actual=leagueData?.actualResults||{};
   let h='<div class="slabel">Drag to rank teams — your predicted group finish</div><div class="gg">';
-  GK.forEach(gId=>{
+  GK.forEach(function(gId){
     const ranked=groupRank[gId]||GROUPS[gId];
     const ar=actual['grank_'+gId]||[];
-    h+='<div class="gc" data-gid="'+gId+'"><div class="gc-hdr">Group '+gId+' <span class="gc-hdr-hint">drag ↕</span></div>';
-    ranked.forEach((t,i)=>{
+    h+='<div class="gc" data-gid="'+gId+'"><div class="gc-hdr">Group '+gId+' <span class="gc-hdr-hint">drag \u2195</span></div>';
+    ranked.forEach(function(t,i){
       const posLbl=gId+(i+1);
       const isAdv=i<2,is3rd=i===2;
       const dotCls=isAdv?'d-adv':is3rd?'d-3rd':'d-out';
       const pbCls=['pb-1','pb-2','pb-3','pb-4'][i];
       const actT=ar[i];const correct=actT&&actT.n===t.n;
       const isTouchSel=touchGid===gId&&touchSrc===i;
-      h+='<div class="rank-row '+( isTouchSel?'drag-over':'')+'" draggable="true" data-gid="'+gId+'" data-idx="'+i+'" ondragstart="onDragStart(event,'\''+gId+'\'','+i+')" ondragover="onDragOver(event,'\''+gId+'\'','+i+')" ondrop="onDrop(event,'\''+gId+'\'','+i+')" ondragend="onDragEnd(event)" onclick="onTouchRank('\''+gId+'\'','+i+')">'
-      +'<div class="adv-dot '+dotCls+'"></div>'
-      +'<span class="pos-badge '+pbCls+'">'+posLbl+'</span>'
-      +'<span class="tf">'+t.f+'</span>'
-      +'<span class="tn">'+t.n+'</span>'
-      +(correct?'<span class="rank-correct">+1</span>':'')
-      +'<span class="drag-handle">⠿</span>'
-      +'</div>';
+      const tJson=JSON.stringify(t);
+      h+='<div class="rank-row'+(isTouchSel?' drag-over':'')+'" draggable="true"'
+        +' data-gid="'+gId+'" data-idx="'+i+'">'
+        +'<div class="adv-dot '+dotCls+'"></div>'
+        +'<span class="pos-badge '+pbCls+'">'+posLbl+'</span>'
+        +'<span class="tf">'+t.f+'</span>'
+        +'<span class="tn">'+t.n+'</span>'
+        +(correct?'<span class="rank-correct">+1</span>':'')
+        +'<span class="drag-handle">\u2807</span>'
+        +'</div>';
     });
     h+='<div class="gc-legend"><span class="leg-item"><span class="adv-dot d-adv"></span>Qualifies</span><span class="leg-item"><span class="adv-dot d-3rd"></span>3rd place</span><span class="leg-item"><span class="adv-dot d-out"></span>Out</span></div>';
     h+='</div>';
   });
-  document.getElementById('t-groups').innerHTML=h+'</div>';
+  const el=document.getElementById('t-groups');
+  el.innerHTML=h+'</div>';
+  // Wire up drag/touch events via delegation
+  el.querySelectorAll('.rank-row').forEach(function(row){
+    const gId=row.dataset.gid, idx=parseInt(row.dataset.idx);
+    row.addEventListener('dragstart',function(e){onDragStart(e,gId,idx);});
+    row.addEventListener('dragover',function(e){onDragOver(e,gId,idx);});
+    row.addEventListener('drop',function(e){onDrop(e,gId,idx);});
+    row.addEventListener('dragend',function(e){onDragEnd(e);});
+    row.addEventListener('click',function(){onTouchRank(gId,idx);});
+  });
 }
 
 // Override render3rd
@@ -1756,7 +1779,7 @@ async function renderRes(){
     const d=await readBin(binId);leagueData=d;
     const actual=d.actualResults||{};
     let h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px"><div class="slabel" style="margin:0">Enter Actual Results</div><button class="btn btn-lime btn-sm" onclick="saveResults()">Save & Update Scores</button></div>';
-    h+='<div style="font-size:13px;color:var(--muted);margin-bottom:20px;font-weight:600">As admin, enter actual results below. Saving recalculates everyone''s scores automatically.</div>';
+    h+='<div style="font-size:13px;color:var(--muted);margin-bottom:20px;font-weight:600">As admin, enter actual results below. Saving recalculates everyone\'s scores automatically.</div>';
     // Group rankings
     h+='<div class="slabel">Group Stage — actual finishing order (1st & 2nd score +1pt each)</div><div class="res-grid">';
     GK.forEach(id=>{
